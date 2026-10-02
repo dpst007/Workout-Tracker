@@ -32,20 +32,22 @@ S.ses=S.ses||{};S.body=S.body||{};S.cfg=S.cfg||{};
 const save=()=>localStorage.p4=JSON.stringify(S);
 const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
 const dow=d=>(new Date(d+'T12:00').getDay()+6)%7;
+const pd=d=>S.ses[d]&&S.ses[d].pd!==undefined?S.ses[d].pd:dow(d);
 let date=iso(new Date()),tab='w',pex='',timer;
 const toast=t=>{const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2200)};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function lastFor(n,d){for(const k of Object.keys(S.ses).sort().reverse()){if(k>=d)continue;for(const e of S.ses[k].ex)if(e.n===n&&e.s.some(x=>x[1]!==''))return{d:k,s:e.s}}return null}
 function weekOf(d){if(S.cfg.start){return Math.max(1,Math.floor((new Date(d)-new Date(S.cfg.start))/6048e5)+1)}const ks=Object.keys(S.ses).sort();return ks.length?S.ses[ks[ks.length-1]].wk:1}
-function ses(){if(S.ses[date])return S.ses[date];const p=PLAN[dow(date)];
+function ses(x){if(S.ses[date]&&x===undefined)return S.ses[date];const dx=x!==undefined?x:dow(date),p=PLAN[dx];
  const ex=p.items.map((e,i)=>{const l=lastFor(e.n,date);return{k:i,p:e.n,n:e.n,m:'',s:Array.from({length:e.ns},(_,j)=>[l&&l.s[j]?l.s[j][0]:e.w0,''])}});
- return S.ses[date]={day:p.title,wk:weekOf(date),ex,cd:{done:false,m:''},dirty:0}}
-const plan=e=>PLAN[dow(date)].items[e.k]||{sec:'Extra',ns:3,rep:'',note:'',hint:'',tag:''};
+ return S.ses[date]={day:p.title,pd:dx,wk:weekOf(date),ex,cd:{done:false,m:''},dirty:0}}
+const plan=e=>PLAN[pd(date)].items[e.k]||{sec:'Extra',ns:3,rep:'',note:'',hint:'',tag:''};
 function R(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
  const names=new Set();PLAN.forEach(p=>p.items.forEach(i=>names.add(i.n)));Object.values(S.ses).forEach(s=>s.ex.forEach(e=>names.add(e.n)));
  $('#names').innerHTML=[...names].map(n=>`<option value="${esc(n)}">`).join('');
  $('#app').innerHTML={w:rw,p:rp,b:rb,s:rs}[tab]()}
-function rw(){const s=ses(),p=PLAN[dow(date)];let h=`<div class=top><button data-a=prev>‹</button><input type=date id=dt value="${date}"><button data-a=next>›</button></div>
+function rw(){const s=ses(),p=PLAN[pd(date)];let h=`<div class=top><button data-a=prev>‹</button><input type=date id=dt value="${date}"><button data-a=next>›</button></div>
+<label style="margin:8px 0 3px">Today's workout type</label><select id=wt style="width:100%">${PLAN.map((x,i)=>`<option value=${i} ${i===pd(date)?'selected':''}>${esc(x.title)}</option>`).join('')}</select>
 <div class=hd><b>${esc(p.title)}</b><span>Week <button class=sm data-a=wm>−</button> <b>${s.wk}</b> <button class=sm data-a=wp>+</button></span></div>`;
  if(p.rest)h+=`<div class=card>😴 ${esc(p.rest)}</div>`;let last='';
  s.ex.forEach((e,i)=>{const q=plan(e);if((q.sec||'')!==last){last=q.sec||'';if(last)h+=`<div class=sec>${esc(last)}</div>`}
@@ -76,10 +78,10 @@ function rs(){const c=S.cfg;return`<div class=hd><b>Settings & Excel</b></div><d
 <p class=mut>${unsynced()} day(s) pending sync. Data is stored on this phone and mirrored to your Google Sheet.</p>`}
 const unsynced=()=>Object.values(S.ses).filter(s=>s.dirty).length;
 function rows(only){const r=[];Object.entries(S.ses).sort().forEach(([d,s])=>{if(only&&!s.dirty)return;
- s.ex.forEach(e=>{const q=PLAN[dow(d)].items[e.k]||{};const ok=e.s.map((x,j)=>[j+1,x[0],x[1]]).filter(x=>x[2]!=='');
+ s.ex.forEach(e=>{const q=PLAN[pd(d)].items[e.k]||{};const ok=e.s.map((x,j)=>[j+1,x[0],x[1]]).filter(x=>x[2]!=='');
   const base=[d,s.wk,s.day,q.sec||'Extra',e.p,e.n];
   if(ok.length)ok.forEach((x,i)=>r.push([...base,x[0],x[1],x[2],i===0?e.m:'']));else if(e.m)r.push([...base,'','','',e.m])});
- if(s.cd.done||s.cd.m)r.push([d,s.wk,s.day,'Cardio',PLAN[dow(d)].cardio,PLAN[dow(d)].cardio,'','','',(s.cd.done?'DONE. ':'')+s.cd.m])});return r}
+ if(s.cd.done||s.cd.m)r.push([d,s.wk,s.day,'Cardio',PLAN[pd(d)].cardio,PLAN[pd(d)].cardio,'','','',(s.cd.done?'DONE. ':'')+s.cd.m])});return r}
 const HEAD=['Date','Week','Day','Section','Planned exercise','Exercise done','Set','Weight (kg)','Reps/Secs','Remarks'];
 const body=()=>Object.entries(S.body).map(([w,b])=>[+w,b.wt||'',b.waist||'',b.chest||'',b.arms||'',b.en||'',b.sl||'',b.mood||'']);
 async function sync(){if(!S.cfg.url){toast('Add Web App URL in Settings');return}
@@ -98,6 +100,9 @@ document.addEventListener('input',e=>{const t=e.target,d=t.dataset,s=ses();
  else if(d.c){s.cd[d.c]=d.c==='done'?t.checked:t.value;touch()}
  else if(d.b){const w=s.wk;(S.body[w]=S.body[w]||{})[d.b]=t.value;save();if(S.cfg.url){clearTimeout(timer);timer=setTimeout(sync,5000)}}
  else if(t.id==='dt'&&t.value){date=t.value;R()}else if(t.id==='ps'){pex=t.value;R()}
+ else if(t.id==='wt'){const old=ses(),x=+t.value,has=old.ex.some(e=>e.s.some(y=>y[1]!=='')||e.m)||old.ex.length>PLAN[pd(date)].items.length;
+  if(has&&!confirm('Switch workout type? This clears the exercises already entered for this date.')){R();return}
+  const wk=old.wk,cd=old.cd;delete S.ses[date];const n=ses(x);n.wk=wk;n.cd=cd;n.dirty=1;save();R()}
  else if(t.id==='url'){S.cfg.url=t.value.trim();save()}else if(t.id==='st'){S.cfg.start=t.value;save()}});
 document.addEventListener('click',e=>{const n=e.target.closest('nav button');if(n){tab=n.dataset.t;R();return}
  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,s=ses(),k=b.dataset.k;
